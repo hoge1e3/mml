@@ -1,0 +1,4 @@
+﻿dist
+*.js
+*.js.map
+js/test/test.d.ts

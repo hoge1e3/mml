@@ -1,0 +1,22 @@
+{
+  "name":"@hoge1e3/mml",
+  "type": "module",
+  "types": "js/src/mml.d.ts",
+  "description": "mml player using @hoge1e3/oscillator ",
+  "scripts": {
+    "webpack-dev": "npx webpack --mode=development",
+    "webpack": "npx webpack --mode=production",
+    "build": "npx tsc && npx webpack",
+    "build-dev": "npx tsc && npm run webpack-dev",
+    "tsc": "npx tsc",
+    "test": "npx http-server -o js/test/index.html"
+  },
+  "dependencies": {
+    "@hoge1e3/oscillator": "^1.0.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.99.5",
+    "webpack-cli": "^6.0.1",
+    "typescript": "^5.8.3"
+  }
+}
