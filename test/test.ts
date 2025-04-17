@@ -12,5 +12,5 @@ export async function playSound(mml:string) {
     const m=mp.parse();
     const src=toSource(m,120);
     console.log(mp, m, src);
-    src.play(audioCtx);
+    playback=src.play(audioCtx);
 }

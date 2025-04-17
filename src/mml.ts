@@ -12,7 +12,7 @@ export type LieteralSet={
     rhysms?: Map<string, Source>;
 }
 export const standardLiteralSet:LieteralSet={
-    scales: ["a","b","c","d","e","f","g"],
+    scales: ["c","d","e","f","g","a","b"],
     rest: "r",
     octave: {up:">", down:"<"},
     length: "l",
@@ -22,7 +22,7 @@ export const standardLiteralSet:LieteralSet={
     halfSyllable: ".",    
 };
 export const japaneseLiteralSet:LieteralSet={
-    scales: ["ラ","シ","ド","レ","ミ","ファ","ソ"],
+    scales: ["ド","レ","ミ","ファ","ソ","ラ","シ"],
     concatLength: "&",
     rest: "・",
     octave: {up:/^[↑^]/, down:/^[↓_＿]/},
@@ -31,7 +31,7 @@ export const japaneseLiteralSet:LieteralSet={
     sharp: /^[#＃]/, flat: "♭",
     halfSyllable: /^[．.]/,
 };
-const scaleOffset=[-3, -1,0, 2, 4,5, 7];
+const scaleOffset=[0, 2, 4,5, 7, 9, 11];
 
 export interface NoteLength {
     n: number;   // numerator
@@ -139,53 +139,6 @@ export class MelodyParser extends Parser {
         const literals=this.literals;
         const state=this.state;
         const scls=literals.scales;
-        /*function reg(p:RegExp):RegExpExecArray|undefined {
-            const looking=mml.substring(i);
-            const m=p.exec(looking);
-            if (m) {
-                i+=m[0].length;
-                return m;
-            }
-        }
-        function str(p:string):RegExpExecArray|undefined {
-            const looking=mml.substring(i);
-            if (looking.startsWith(p)) {
-                i+=p.length;
-                const groups=[p];
-                return Object.assign(groups,{groups, index:0, input:looking}) as any;
-            }
-        }
-        function look(p:Pattern) {
-            if (typeof p==="string") return str(p);
-            return reg(p);
-        }
-        const parseLen=()=>{
-            let length=state.length;
-            let length1=nl(0,1);
-            while (true) {
-                const lennum=look(/^[0-9]+/);
-                if (!lennum) break;
-                length1=addNoteLength(length1, nl(1, parseInt(lennum[0])));
-                const and=look(literals.concatLength);
-                if (!and) break;
-            }
-            if (length1.n>0) length=length1;
-            let length2=length;
-            while (true) {
-                const longs=look(literals.longSyllable);
-                if (longs) {
-                    length=addNoteLength(length, length2)
-                    continue;
-                }
-                const halfs=look(literals.halfSyllable);
-                if (halfs) {
-                    length=addNoteLength(length, nl(length2.n, length2.d*2));
-                    continue;
-                }
-                break;
-            }
-            return length;
-        }*/
         const read=this.read.bind(this);
         const parseLen=this.parseLen.bind(this);
         while(!this.eos()) {
@@ -207,6 +160,13 @@ export class MelodyParser extends Parser {
             if (read(literals.rest)) {
                 let length=parseLen(state.length);
                 result.push({scale: null, length});    
+            } else if (read(literals.length)) {
+                const deflen=parseLen(state.length);
+                state.length=deflen;
+            } else if (read(literals.octave.up)) {
+                state.octave++;
+            } else if (read(literals.octave.down)) {
+                state.octave--;
             }
             if (pi==this.i) this.i++;
         }
