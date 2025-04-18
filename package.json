@@ -1,5 +1,5 @@
 {
-  "name":"@hoge1e3/mml",
+  "name": "@hoge1e3/mml",
   "type": "module",
   "types": "js/src/mml.d.ts",
   "description": "mml player using @hoge1e3/oscillator ",
@@ -18,5 +18,6 @@
     "webpack": "^5.99.5",
     "webpack-cli": "^6.0.1",
     "typescript": "^5.8.3"
-  }
+  },
+  "version": "1.0.1"
 }
