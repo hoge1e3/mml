@@ -1,37 +1,67 @@
 import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform} from "@hoge1e3/oscillator";
 export * as oscillator from "@hoge1e3/oscillator";
 export type Pattern=string|RegExp;
-export type LieteralSet={
-    scales:Pattern[],
+export type LengthLiteralSet={
     longSyllable: Pattern, 
     halfSyllable: Pattern, 
-    concatLength: Pattern,
+    concatLength: Pattern,  
+};
+export type MelodyLieteralSet=LengthLiteralSet & {
+    scales:Pattern[],
     rest: Pattern,
     sharp: Pattern, flat: Pattern,
     octave: {up:Pattern, down:Pattern},
-    length: Pattern,
-    rhysms?: Map<string, Source>;
+    defaultLength: Pattern,
+};
+export type RhysmLiteralSetBase=LengthLiteralSet & {    
+    rest: Pattern,
+    lengthBase?: NoteLength,  // 1/2
+    unbase?: Pattern, //ン
+    defaultLength: Pattern, // "L"
+}; 
+export type RhysmSet=Map<Pattern, Waveform> ;
+export type RhysmLiteralSet=RhysmLiteralSetBase & { rhysms: RhysmSet };
+export const standardRhysmLiteralSetBase:RhysmLiteralSetBase={
+    concatLength: "&",
+    longSyllable: "^", 
+    halfSyllable: ".",    
+    rest :"r",
+    defaultLength :"l",
+};
+export function createRhysmLiteralSet(base: RhysmLiteralSetBase, rhysms: RhysmSet):RhysmLiteralSet {
+    return {...base, rhysms};
 }
-export const standardLiteralSet:LieteralSet={
+export const standardLiteralSet:MelodyLieteralSet={
     scales: ["c","d","e","f","g","a","b"],
     rest: "r",
     octave: {up:">", down:"<"},
-    length: "l",
+    sharp :/^[#+]/, flat: "-",
+    defaultLength: "l",
     concatLength: "&",
     longSyllable: "^", 
-    sharp :/^[#+]/, flat: "-",
     halfSyllable: ".",    
 };
-export const japaneseLiteralSet:LieteralSet={
-    scales: ["ド","レ","ミ","ファ","ソ","ラ","シ"],
+export const standardMelodyLiteralSet=standardLiteralSet;
+export const japaneseRhysmLiteralSetBase:RhysmLiteralSetBase={
+    lengthBase: nl(1,2), unbase: "ン",
+    rest :"・",
+    defaultLength :"l",
     concatLength: "&",
+    longSyllable: /^[ー〜]/, 
+    halfSyllable: /^[．.]/,
+    //rhysms: ["ド","タ","ツ","ク", "チ", "パ"],
+};
+export const japaneseLiteralSet:MelodyLieteralSet={
+    scales: ["ド","レ","ミ","ファ","ソ","ラ","シ"],
     rest: "・",
     octave: {up:/^[↑^]/, down:/^[↓_＿]/},
-    length: "l",
-    longSyllable: /^[ー〜]/, 
+    defaultLength: "l",
     sharp: /^[#＃]/, flat: "♭",
+    concatLength: "&",
+    longSyllable: /^[ー〜]/, 
     halfSyllable: /^[．.]/,
 };
+export const japaneseMelodyLiteralSet=japaneseLiteralSet;
 const scaleOffset=[0, 2, 4,5, 7, 9, 11];
 
 export interface NoteLength {
@@ -57,12 +87,32 @@ function addNoteLength(a: NoteLength, b: NoteLength): NoteLength {
         d: commonDenominator / divisor,
     };
 }
+function normalizeLength(a:NoteLength):NoteLength {
+    if (a.n==0) return nl(0,1);
+    const divisor=gcd(a.n, a.d);
+    return {
+        n: (a.n) / divisor,
+        d: (a.d) / divisor,
+    };
+
+}
+function mulNoteLength(a: NoteLength, b: NoteLength): NoteLength {
+    return normalizeLength({
+        n: (a.n * b.n),
+        d: (a.d * b.d),
+    });
+}
 
 export interface Note {
     scale: number|null; //0-95 ,null=rest
     length: NoteLength;
 }
+export interface Drum {
+    waveform: Waveform|null; // null=rest
+    length: NoteLength;
+}
 export type Melody=Note[];
+export type Rhysm=Drum[];
 export type MelodyState={
     length: NoteLength,
     octave: number,
@@ -70,9 +120,10 @@ export type MelodyState={
 export type StateBase={
     length: NoteLength,
 };
+export type RhysmState=StateBase;
 export abstract class Parser {
     i=0;
-    constructor (public literals: LieteralSet, public mml:string){
+    constructor (public literals: LengthLiteralSet, public mml:string){
     }
     eos() {
         return this.i>=this.mml.length;
@@ -132,7 +183,7 @@ export class MelodyParser extends Parser {
     public state:MelodyState={
         length: nl(1,4), octave:4,
     };
-    constructor(literals: LieteralSet, mml:string, ) {
+    constructor(public literals: MelodyLieteralSet, mml:string, ) {
         super(literals, mml);
     }
     parse():Melody {
@@ -161,13 +212,54 @@ export class MelodyParser extends Parser {
             if (read(literals.rest)) {
                 let length=parseLen(state.length);
                 result.push({scale: null, length});    
-            } else if (read(literals.length)) {
+            } else if (read(literals.defaultLength)) {
                 const deflen=parseLen(state.length);
                 state.length=deflen;
             } else if (read(literals.octave.up)) {
                 state.octave++;
             } else if (read(literals.octave.down)) {
                 state.octave--;
+            }
+            if (pi==this.i) this.i++;
+        }
+        return result;
+    }
+}
+export class RhysmParser extends Parser {
+    public state:RhysmState={
+        length: nl(1,4),
+    };
+    constructor(public literals: RhysmLiteralSet, mml:string, ) {
+        super(literals, mml);
+    }
+    parse():Rhysm {
+        let result=[] as Rhysm;
+        const literals=this.literals;
+        const state=this.state;
+        const read=this.read.bind(this);
+        const parseLen=this.parseLen.bind(this);
+        while(!this.eos()) {
+            let pi=this.i;
+            for (let [pat, source] of literals.rhysms) {
+                if (!read(pat)) continue;
+                let base=nl(1,1);
+                if (literals.lengthBase) base=literals.lengthBase;
+                if (literals.unbase) {
+                    if (read(literals.unbase)) {
+                        base=nl(1,1);
+                    }
+                }
+                let length=parseLen(state.length);
+                length=mulNoteLength(length, base);
+                result.push({waveform: source, length});
+                break;
+            }
+            if (read(literals.rest)) {
+                let length=parseLen(state.length);
+                result.push({waveform: null, length});    
+            } else if (read(literals.defaultLength)) {
+                const deflen=parseLen(state.length);
+                state.length=deflen;
             }
             if (pi==this.i) this.i++;
         }
@@ -196,6 +288,26 @@ export function toSource(m:Melody, tempo:number, wave: Waveform="square"):Source
             decay: 0.1, // time in seconds to reach sustain level
             sustain: 0.5, // volume level during sustain (0 to 1)
             release: 0.1, // time in seconds to fade out
+        }))
+    } 
+    return joinSource(...notes);
+}
+export const melodyToSource=toSource;
+export function rhysmToSource(r:Rhysm, tempo:number):Source {
+    // t120 = l2 = 1sec
+    // t240 = l1 = 1sec
+    const todur=(len:NoteLength)=>(len.n)/(len.d)*240/tempo;
+    const notes=[] as Source[];
+    for (let note of r) {
+        if (note.waveform==null) {
+            notes.push(createMuteNote(todur(note.length)));
+            continue;   
+        }
+        notes.push(createNote(todur(note.length), 440, 0.5, note.waveform, {
+            attack: 0, // time in seconds to reach max volume
+            decay: 0.1, // time in seconds to reach sustain level
+            sustain: 1, // volume level during sustain (0 to 1)
+            release: 0, // time in seconds to fade out
         }))
     } 
     return joinSource(...notes);
