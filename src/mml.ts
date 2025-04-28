@@ -1,4 +1,5 @@
-import {createMuteNote, createNote, joinSource, Source} from "@hoge1e3/oscillator";
+import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform} from "@hoge1e3/oscillator";
+export * as oscillator from "@hoge1e3/oscillator";
 export type Pattern=string|RegExp;
 export type LieteralSet={
     scales:Pattern[],
@@ -173,7 +174,7 @@ export class MelodyParser extends Parser {
         return result;
     }
 }
-export function toSource(m:Melody, tempo:number):Source {
+export function toSource(m:Melody, tempo:number, wave: Waveform="square"):Source {
     // 0 = o1c
     // 12 = o2c
     // 24 = o3c
@@ -190,7 +191,7 @@ export function toSource(m:Melody, tempo:number):Source {
             notes.push(createMuteNote(todur(note.length)));
             continue;   
         }
-        notes.push(createNote(todur(note.length), toscl(note.scale),0.5, "square", {
+        notes.push(createNote(todur(note.length), toscl(note.scale),0.5, wave, {
             attack: 0, // time in seconds to reach max volume
             decay: 0.1, // time in seconds to reach sustain level
             sustain: 0.5, // volume level during sustain (0 to 1)

@@ -20,7 +20,7 @@ module.exports = (env,argv)=>({
     mode: 'development',
     // メインとなるJavaScriptファイル（エントリーポイント）
     entry: {
-      index:'./js/src/mml.js',
+      mml:'./js/src/mml.js',
       test:"./js/test/test.js",
     },
     experiments: {
