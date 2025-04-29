@@ -1,12 +1,17 @@
 <div>
-    <input id="mml" value="cdefedc^efgagfe^c^c^c^c^l8ccddeeffe^d^c^"/>
+    <input id="mml" value="cdefedc^efgagfe^c^c^c^c^l8ccddeeffe^d^c^"/><br/>
+    <input id="rhysm" value="bsmchrbbsbbbsb"/><br/>
 </div>
-<button id="play">Play</button>
+<button id="play">Play Melody</button>
+<button id="playR">Play Rhysm</button>
 <button id="stop">Stop</button>
 <script type="module">
-    import {playSound ,stop} from '../../dist/test.js';
+    import {playSound ,playRhysm,stop} from '../../dist/test.js';
     document.getElementById('play').addEventListener('click', () => {
         playSound(document.getElementById('mml').value);
+    });
+    document.getElementById('playR').addEventListener('click', () => {
+        playRhysm(document.getElementById('rhysm').value);
     });
     document.getElementById('stop').addEventListener('click', () => {
         stop();
