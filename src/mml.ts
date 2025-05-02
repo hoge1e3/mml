@@ -1,4 +1,4 @@
-import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform} from "@hoge1e3/oscillator";
+import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform, Playback} from "@hoge1e3/oscillator";
 export * as oscillator from "@hoge1e3/oscillator";
 export type Pattern=string|RegExp;
 export type LengthLiteralSet={
@@ -58,7 +58,9 @@ export const japaneseLiteralSet:MelodyLieteralSet={
     defaultLength: "l",
     sharp: /^[#＃]/, flat: "♭",
     concatLength: "&",
-    longSyllable: /^[ー〜]/, 
+    //https://qiita.com/ryounagaoka/items/4cf5191d1a2763667add
+
+    longSyllable: /^[ー～\u002d\u30fc\u2010-\u2015\u2212\uff70\u301c\uff5e]/, 
     halfSyllable: /^[．.]/,
 };
 export const japaneseMelodyLiteralSet=japaneseLiteralSet;
@@ -131,6 +133,7 @@ export abstract class Parser {
     reg(p:RegExp):RegExpExecArray|undefined {
         const looking=this.mml.substring(this.i);
         const m=p.exec(looking);
+        //console.log("reg",looking, p, m);
         if (m) {
             this.i+=m[0].length;
             return m;
@@ -311,4 +314,59 @@ export function rhysmToSource(r:Rhysm, tempo:number):Source {
         }))
     } 
     return joinSource(...notes);
+}
+
+export class PlayStatement {
+    start:number=0;
+    maxTime=60; // 1 min
+    constructor(
+        public audioCtx:AudioContext,
+        public melodyLiteralSet:MelodyLieteralSet, 
+        public rhysmLiteralSet:RhysmLiteralSet) {}
+    async play(...mmls:string[]) {
+        // if mml starts with @drum, use rhysmLiteralSet
+        // otherwise use melodyLiteralSet
+        let tempo=120;
+        let reg_tempo=/^t([0-9]+)/i;
+        if (this.start==0) {
+            this.start=this.audioCtx.currentTime;
+        } else {
+            // wait until remaining time become less than 1 min
+            const remain=this.remainTime;
+            const wait=remain-this.maxTime;
+            if (wait>0) {
+                await new Promise(r=>setTimeout(r, wait*1000));
+            }    
+        }
+        let next_start=this.start;
+        for (let mml of mmls) {
+            // if mml starts with tXX, set tempo
+            let m=reg_tempo.exec(mml);
+            if (m) {
+                tempo=parseInt(m[1]);
+                mml=mml.substring(m[0].length);
+            }
+            let playback:Playback|undefined;
+            if (mml.startsWith("@drum")) {
+                const mp=new RhysmParser(this.rhysmLiteralSet, mml);
+                const m=mp.parse();
+                const src=rhysmToSource(m, tempo);
+                console.log(mp, m, src);
+                playback=src.play(this.audioCtx, this.start);
+            } else {  
+                const mp=new MelodyParser(this.melodyLiteralSet, mml);
+                const m=mp.parse();
+                const src=melodyToSource(m, tempo);
+                console.log(mp, m, src);
+                playback=src.play(this.audioCtx, this.start);
+            }
+            if (next_start < playback.end) {
+                next_start = playback.end;
+            }
+        }
+        this.start=next_start;
+    }
+    get remainTime() {
+        return Math.max(0, this.start - this.audioCtx.currentTime);
+    }
 }

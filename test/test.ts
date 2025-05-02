@@ -1,6 +1,6 @@
 import { BufferedWaveform, bufferedWaveformOfFile, Playback, Waveform } from "@hoge1e3/oscillator";
 // "../../dist/index.js"
-import { createRhysmLiteralSet, MelodyParser, RhysmLiteralSet, RhysmParser, rhysmToSource, standardLiteralSet, standardRhysmLiteralSetBase, toSource } from "../src/mml.js";
+import { createRhysmLiteralSet, japaneseMelodyLiteralSet, MelodyParser, RhysmLiteralSet, RhysmParser, rhysmToSource, standardLiteralSet, standardRhysmLiteralSetBase, toSource } from "../src/mml.js";
 
 const audioCtx = new AudioContext();
 let playback:Playback|undefined;
@@ -9,6 +9,13 @@ export async function stop() {
 }
 export async function playSound(mml:string) {
     const mp=new MelodyParser(standardLiteralSet,mml);
+    const m=mp.parse();
+    const src=toSource(m,120);
+    console.log(mp, m, src);
+    playback=src.play(audioCtx);
+}
+export async function playJPSound(mml:string) {
+    const mp=new MelodyParser(japaneseMelodyLiteralSet,mml);
     const m=mp.parse();
     const src=toSource(m,120);
     console.log(mp, m, src);

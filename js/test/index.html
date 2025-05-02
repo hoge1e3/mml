@@ -6,9 +6,14 @@
 <button id="playR">Play Rhysm</button>
 <button id="stop">Stop</button>
 <script type="module">
-    import {playSound ,playRhysm,stop} from '../../dist/test.js';
+    import {playSound ,playJPSound, playRhysm,stop} from '../../dist/test.js';
     document.getElementById('play').addEventListener('click', () => {
-        playSound(document.getElementById('mml').value);
+        const value = document.getElementById('mml').value;
+        if (value.match(/[ドレミファソラシド]/)){
+            playJPSound(value);
+        } else {
+            playSound(value);
+        }
     });
     document.getElementById('playR').addEventListener('click', () => {
         playRhysm(document.getElementById('rhysm').value);
