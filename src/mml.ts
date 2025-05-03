@@ -1,4 +1,4 @@
-import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform, Playback} from "@hoge1e3/oscillator";
+import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform, Playback, ADSR} from "@hoge1e3/oscillator";
 export * as oscillator from "@hoge1e3/oscillator";
 export type Pattern=string|RegExp;
 export type LengthLiteralSet={
@@ -217,6 +217,7 @@ export class MelodyParser extends Parser {
                 result.push({scale: null, length});    
             } else if (read(literals.defaultLength)) {
                 const deflen=parseLen(state.length);
+                //console.log("defaultLength", deflen);
                 state.length=deflen;
             } else if (read(literals.octave.up)) {
                 state.octave++;
@@ -269,7 +270,7 @@ export class RhysmParser extends Parser {
         return result;
     }
 }
-export function toSource(m:Melody, tempo:number, wave: Waveform="square"):Source {
+export function toSource(m:Melody, tempo:number, wave: Waveform="square", envelope?: ADSR):Source {
     // 0 = o1c
     // 12 = o2c
     // 24 = o3c
@@ -281,17 +282,20 @@ export function toSource(m:Melody, tempo:number, wave: Waveform="square"):Source
     // t240 = l1 = 1sec
     const todur=(len:NoteLength)=>(len.n)/(len.d)*240/tempo;
     const notes=[] as Source[];
+    let _envelope; 
+    if (!envelope) {
+        _envelope = typeof wave=="string" ? 
+        { attack: 0, decay: 0.1, sustain: 0.5, release: 0.1 }:
+        { attack: 0, decay: 0.1, sustain: 1, release: 0 };
+    } else {
+        _envelope = envelope;   
+    }
     for (let note of m) {
         if (note.scale==null) {
             notes.push(createMuteNote(todur(note.length)));
             continue;   
         }
-        notes.push(createNote(todur(note.length), toscl(note.scale),0.5, wave, {
-            attack: 0, // time in seconds to reach max volume
-            decay: 0.1, // time in seconds to reach sustain level
-            sustain: 0.5, // volume level during sustain (0 to 1)
-            release: 0.1, // time in seconds to fade out
-        }))
+        notes.push(createNote(todur(note.length), toscl(note.scale),0.5, wave, _envelope))
     } 
     return joinSource(...notes);
 }
@@ -322,13 +326,16 @@ export class PlayStatement {
     constructor(
         public audioCtx:AudioContext,
         public melodyLiteralSet:MelodyLieteralSet, 
-        public rhysmLiteralSet:RhysmLiteralSet) {}
+        public rhysmLiteralSet:RhysmLiteralSet,
+        public waves:Waveform[]) {}
     async play(...mmls:string[]) {
         // if mml starts with @drum, use rhysmLiteralSet
         // otherwise use melodyLiteralSet
         let tempo=120;
         let reg_tempo=/^t([0-9]+)/i;
-        if (this.start==0) {
+        let reg_wave=/^@([0-9]+)/i;
+        let reg_drum=/^@drum/i;
+        if (this.start<=this.audioCtx.currentTime) {
             this.start=this.audioCtx.currentTime;
         } else {
             // wait until remaining time become less than 1 min
@@ -339,15 +346,38 @@ export class PlayStatement {
             }    
         }
         let next_start=this.start;
-        for (let mml of mmls) {
-            // if mml starts with tXX, set tempo
-            let m=reg_tempo.exec(mml);
-            if (m) {
-                tempo=parseInt(m[1]);
-                mml=mml.substring(m[0].length);
+        for (let i=0;i<mmls.length; i++) {
+            let mml=mmls[i];
+            let isDrum=false;
+            let wave=this.waves[0];
+            while (true) {
+                let m=reg_tempo.exec(mml);
+                if (m) {
+                    tempo=parseInt(m[1]);
+                    mml=mml.substring(m[0].length);
+                    continue;
+                }
+                m=reg_wave.exec(mml);
+                if (m) {
+                    const wsel=parseInt(m[1]);
+                    if (wsel>=0 && wsel<this.waves.length) {
+                        wave=(this.waves[wsel]);
+                    } else {
+                        console.warn("wave select out of range", m[1], this.waves.length);
+                    }
+                    mml=mml.substring(m[0].length);
+                    continue;
+                }
+                m=reg_drum.exec(mml);
+                if (m) {
+                    isDrum=true;
+                    mml=mml.substring(m[0].length);
+                    continue;
+                }
+                break;
             }
             let playback:Playback|undefined;
-            if (mml.startsWith("@drum")) {
+            if (isDrum) {
                 const mp=new RhysmParser(this.rhysmLiteralSet, mml);
                 const m=mp.parse();
                 const src=rhysmToSource(m, tempo);
@@ -356,13 +386,14 @@ export class PlayStatement {
             } else {  
                 const mp=new MelodyParser(this.melodyLiteralSet, mml);
                 const m=mp.parse();
-                const src=melodyToSource(m, tempo);
+                const src=melodyToSource(m, tempo, wave);
                 console.log(mp, m, src);
                 playback=src.play(this.audioCtx, this.start);
             }
             if (next_start < playback.end) {
                 next_start = playback.end;
             }
+            
         }
         this.start=next_start;
     }

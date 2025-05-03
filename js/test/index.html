@@ -1,12 +1,14 @@
 <div>
-    <input id="mml" value="cdefedc^efgagfe^c^c^c^c^l8ccddeeffe^d^c^"/><br/>
+    <!--cdefedc^efgagfe^c^c^c^c^l8ccddeeffe^d^c^-->
+    <input id="mml" value="ceg,eg>c,g<ec"/><br/>
     <input id="rhysm" value="bsmchrbbsbbbsb"/><br/>
 </div>
 <button id="play">Play Melody</button>
 <button id="playR">Play Rhysm</button>
+<button id="playS">Play Statement</button>
 <button id="stop">Stop</button>
 <script type="module">
-    import {playSound ,playJPSound, playRhysm,stop} from '../../dist/test.js';
+    import {playSound ,playJPSound, playRhysm, playStatement, stop} from '../../dist/test.js';
     document.getElementById('play').addEventListener('click', () => {
         const value = document.getElementById('mml').value;
         if (value.match(/[ドレミファソラシド]/)){
@@ -17,6 +19,13 @@
     });
     document.getElementById('playR').addEventListener('click', () => {
         playRhysm(document.getElementById('rhysm').value);
+    });
+    document.getElementById('playS').addEventListener('click', function () {
+        this.disabled=true;
+        playStatement(...document.getElementById('mml').value.split(/,/)).then(()=>{
+            this.disabled=false;
+
+        });
     });
     document.getElementById('stop').addEventListener('click', () => {
         stop();

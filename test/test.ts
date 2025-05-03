@@ -1,6 +1,6 @@
 import { BufferedWaveform, bufferedWaveformOfFile, Playback, Waveform } from "@hoge1e3/oscillator";
 // "../../dist/index.js"
-import { createRhysmLiteralSet, japaneseMelodyLiteralSet, MelodyParser, RhysmLiteralSet, RhysmParser, rhysmToSource, standardLiteralSet, standardRhysmLiteralSetBase, toSource } from "../src/mml.js";
+import { createRhysmLiteralSet, japaneseMelodyLiteralSet, MelodyParser, PlayStatement, RhysmLiteralSet, RhysmParser, rhysmToSource, standardLiteralSet, standardRhysmLiteralSetBase, toSource } from "../src/mml.js";
 
 const audioCtx = new AudioContext();
 let playback:Playback|undefined;
@@ -56,6 +56,23 @@ maou_se_inst_piano2_6ra.wav`.split(/\r?\n/);
                   H ハイハット")
     */
 }
+export async function loadWaves() {
+    const files=["maou_se_inst_piano2_6ra.wav",
+        "maou_se_inst_guitar09.wav",
+        "maou_se_inst_guitar13.wav",
+        "beep-rotmcits-com.wav",
+        "bell-rotmcits-com.wav",
+        "cowbell-rotmcits-com.wav",
+        "harp-vsq-cojp.wav",
+        "okehi-rotmcits-com.wav",];
+    const wavs=[] as  BufferedWaveform[];
+    for (let file of files) {
+        const a:ArrayBuffer=await fetch(`./sounds/${file}`).then(r=>r.arrayBuffer());
+        const buf=await bufferedWaveformOfFile(audioCtx, a, 440);
+        wavs.push(buf);
+    }
+    return wavs;
+}
 export async function playRhysm(mml:string) {
     const rl=await loadRhysmLiteralSet();
 
@@ -64,4 +81,17 @@ export async function playRhysm(mml:string) {
     const src=rhysmToSource(m,120);
     console.log(rp, m, src);
     playback=src.play(audioCtx);
+}
+let ps:PlayStatement|undefined;
+async function initPlayStatement() {
+    if (ps)return ps;
+    const rl=await loadRhysmLiteralSet();
+    const waves=await loadWaves();
+    ps = new PlayStatement(audioCtx, standardLiteralSet, rl, waves);
+    return ps;
+}
+export async function playStatement(...mmls:string[]) {
+    const ps=await initPlayStatement();
+    const m=await ps.play(...mmls);
+    console.log("playStatement", ps, m);
 }
