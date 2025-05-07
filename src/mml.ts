@@ -319,10 +319,20 @@ export function rhysmToSource(r:Rhysm, tempo:number):Source {
     } 
     return joinSource(...notes);
 }
-
+export type PlayState = {
+    playback:Playback,
+    state: MelodyState|RhysmState,
+};
+const rs2ms=(state:RhysmState|MelodyState):MelodyState=>{
+    return {
+        length: state.length,
+        octave: "octave" in state ? state.octave : 4,
+    };
+}
 export class PlayStatement {
     start:number=0;
     maxTime=60; // 1 min
+    public playStates=[] as PlayState[];
     constructor(
         public audioCtx:AudioContext,
         public melodyLiteralSet:MelodyLieteralSet, 
@@ -377,23 +387,30 @@ export class PlayStatement {
                 break;
             }
             let playback:Playback|undefined;
+            let state:RhysmState|MelodyState;
             if (isDrum) {
                 const mp=new RhysmParser(this.rhysmLiteralSet, mml);
+                if (this.playStates[i]?.state) mp.state=this.playStates[i]?.state;
                 const m=mp.parse();
                 const src=rhysmToSource(m, tempo);
                 console.log(mp, m, src);
                 playback=src.play(this.audioCtx, this.start);
+                state=mp.state;
             } else {  
                 const mp=new MelodyParser(this.melodyLiteralSet, mml);
+                if (this.playStates[i]?.state) mp.state=rs2ms(this.playStates[i]?.state);
                 const m=mp.parse();
                 const src=melodyToSource(m, tempo, wave);
                 console.log(mp, m, src);
                 playback=src.play(this.audioCtx, this.start);
+                state=mp.state;
             }
             if (next_start < playback.end) {
                 next_start = playback.end;
             }
-            
+            this.playStates[i] = {
+                playback,state
+            };
         }
         this.start=next_start;
     }
