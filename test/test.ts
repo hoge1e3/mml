@@ -6,6 +6,7 @@ const audioCtx = new AudioContext();
 let playback:Playback|undefined;
 export async function stop() {
     playback?.stop();
+    ps?.stop();
 }
 export async function playSound(mml:string) {
     const mp=new MelodyParser(standardLiteralSet,mml);
@@ -92,6 +93,8 @@ async function initPlayStatement() {
 }
 export async function playStatement(...mmls:string[]) {
     const ps=await initPlayStatement();
+    (globalThis as any).ps=ps;
     const m=await ps.play(...mmls);
     console.log("playStatement", ps, m);
+    return ps;
 }

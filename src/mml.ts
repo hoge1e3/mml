@@ -1,4 +1,4 @@
-import {createMuteNote, createNote, joinSource, Source, BufferedWaveform, Waveform, Playback, ADSR} from "@hoge1e3/oscillator";
+import {createMuteNote, createNote, joinSource, BufferedWaveform, Waveform, Playback, ADSR, parallelSource, joinPlaybackAndSource, Source} from "@hoge1e3/oscillator";
 export * as oscillator from "@hoge1e3/oscillator";
 export type Pattern=string|RegExp;
 export type LengthLiteralSet={
@@ -319,10 +319,7 @@ export function rhysmToSource(r:Rhysm, tempo:number):Source {
     } 
     return joinSource(...notes);
 }
-export type PlayState = {
-    playback:Playback,
-    state: MelodyState|RhysmState,
-};
+export type PlayState = MelodyState|RhysmState;
 const rs2ms=(state:RhysmState|MelodyState):MelodyState=>{
     return {
         length: state.length,
@@ -330,9 +327,13 @@ const rs2ms=(state:RhysmState|MelodyState):MelodyState=>{
     };
 }
 export class PlayStatement {
-    start:number=0;
+    //start:number=0;
     maxTime=60; // 1 min
     public playStates=[] as PlayState[];
+    private _playback:Playback|undefined;
+    public get playback():Playback|undefined {
+        return (this._playback && this._playback.end>this.audioCtx.currentTime) ? this._playback : undefined;
+    }
     constructor(
         public audioCtx:AudioContext,
         public melodyLiteralSet:MelodyLieteralSet, 
@@ -345,17 +346,16 @@ export class PlayStatement {
         let reg_tempo=/^t([0-9]+)/i;
         let reg_wave=/^@([0-9]+)/i;
         let reg_drum=/^@drum/i;
-        if (this.start<=this.audioCtx.currentTime) {
-            this.start=this.audioCtx.currentTime;
-        } else {
-            // wait until remaining time become less than 1 min
-            const remain=this.remainTime;
-            const wait=remain-this.maxTime;
-            if (wait>0) {
-                await new Promise(r=>setTimeout(r, wait*1000));
-            }    
-        }
-        let next_start=this.start;
+
+        // wait until remaining time become less than 1 min
+        const remain=this.remainTime;
+        const wait=remain-this.maxTime;
+        if (wait>0) {
+            await new Promise(r=>setTimeout(r, wait*1000));
+        }    
+    
+        //let next_start=this.start;
+        let sources=[] as Source[];
         for (let i=0;i<mmls.length; i++) {
             let mml=mmls[i];
             let isDrum=false;
@@ -386,35 +386,44 @@ export class PlayStatement {
                 }
                 break;
             }
-            let playback:Playback|undefined;
             let state:RhysmState|MelodyState;
             if (isDrum) {
                 const mp=new RhysmParser(this.rhysmLiteralSet, mml);
-                if (this.playStates[i]?.state) mp.state=this.playStates[i]?.state;
+                if (this.playStates[i]) mp.state=this.playStates[i];
                 const m=mp.parse();
                 const src=rhysmToSource(m, tempo);
                 console.log(mp, m, src);
-                playback=src.play(this.audioCtx, this.start);
+                
+                sources.push(src);//.play(this.audioCtx, this.start);
                 state=mp.state;
             } else {  
                 const mp=new MelodyParser(this.melodyLiteralSet, mml);
-                if (this.playStates[i]?.state) mp.state=rs2ms(this.playStates[i]?.state);
+                if (this.playStates[i]) mp.state=rs2ms(this.playStates[i]);
                 const m=mp.parse();
                 const src=melodyToSource(m, tempo, wave);
                 console.log(mp, m, src);
-                playback=src.play(this.audioCtx, this.start);
+                sources.push(src);//
+                //sources=src.play(this.audioCtx, this.start);
                 state=mp.state;
             }
-            if (next_start < playback.end) {
-                next_start = playback.end;
-            }
-            this.playStates[i] = {
-                playback,state
-            };
+            /*if (next_start < sources.end) {
+                next_start = sources.end;
+            }*/
+            this.playStates[i] = state;
         }
-        this.start=next_start;
+        const newSource=parallelSource(...sources);
+        if (this.playback ) {
+            this._playback=joinPlaybackAndSource(this.playback, newSource); 
+        } else {
+            this._playback=newSource.play(this.audioCtx, this.audioCtx.currentTime);
+        }
+        //this.start=this._playback.end;
+    }
+    stop() {
+        this.playback?.stop();
     }
     get remainTime() {
-        return Math.max(0, this.start - this.audioCtx.currentTime);
+        if (!this.playback) return 0;
+        return Math.max(0, this.playback.end - this.audioCtx.currentTime);
     }
 }
