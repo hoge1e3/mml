@@ -417,6 +417,7 @@ export class PlayStatement {
         } else {
             this._playback=newSource.play(this.audioCtx, this.audioCtx.currentTime);
         }
+        this._playback.promise.catch((e)=>this._playback=undefined);
         //this.start=this._playback.end;
     }
     stop() {

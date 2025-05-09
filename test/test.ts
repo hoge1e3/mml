@@ -93,8 +93,12 @@ async function initPlayStatement() {
 }
 export async function playStatement(...mmls:string[]) {
     const ps=await initPlayStatement();
-    (globalThis as any).ps=ps;
+    (globalThis as any).ps=ps;  
     const m=await ps.play(...mmls);
     console.log("playStatement", ps, m);
+    ps.playback?.promise.then(
+        ()=>console.log("End", ... mmls),
+        ()=>console.log("Stop", ... mmls),
+    );
     return ps;
 }
